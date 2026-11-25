@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Scout member or Pembina profile isolated per authenticated user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "jenjang": {
+          "type": "string",
+          "enum": ["Siaga", "Penggalang", "Penegak", "Pembina", "Pembina Damping"]
+        },
+        "institutionName": { "type": "string" },
+        "gudepNumber": { "type": "string" },
+        "unitName": { "type": "string" },
+        "xp": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "fullName", "username", "email", "jenjang", "institutionName", "gudepNumber", "unitName", "xp", "createdAt", "updatedAt"]
+    },
+    "UserBackup": {
+      "title": "UserBackup",
+      "description": "JSON snapshot backup of user progress, SKU/TKK, quizzes, and unit logs.",
+      "type": "object",
+      "properties": {
+        "payloadJson": { "type": "string" },
+        "deviceLabel": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["payloadJson", "deviceLabel", "createdAt", "updatedAt"]
+    },
+    "Gudep": {
+      "title": "Gudep",
+      "description": "Registered Gugus Depan / school context managed by Pembina.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "institutionName": { "type": "string" },
+        "gudepNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "logoBase64": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "ownerName", "institutionName", "gudepNumber", "address", "createdAt", "updatedAt"]
+    },
+    "GudepMaterial": {
+      "title": "GudepMaterial",
+      "description": "Scout learning material published by Pembina for a specific Gudep.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "gudepId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "jenjangTarget": {
+          "type": "string",
+          "enum": ["Semua", "Siaga", "Penggalang", "Penegak", "Pembina", "Pembina Damping"]
+        },
+        "summary": { "type": "string" },
+        "content": { "type": "string" },
+        "published": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "gudepId", "title", "category", "jenjangTarget", "summary", "content", "published", "createdAt", "updatedAt"]
+    },
+    "GudepTask": {
+      "title": "GudepTask",
+      "description": "Extra scout task assigned by Pembina to target jenjang.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "gudepId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "jenjangTarget": {
+          "type": "string",
+          "enum": ["Semua", "Siaga", "Penggalang", "Penegak"]
+        },
+        "dueDateLabel": { "type": "string" },
+        "xpReward": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "gudepId", "title", "description", "jenjangTarget", "dueDateLabel", "xpReward", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile document"
+    },
+    "/users/{userId}/backups/{backupId}": {
+      "schema": { "$ref": "#/entities/UserBackup" },
+      "description": "Private JSON backup snapshot"
+    },
+    "/gudep/{gudepId}": {
+      "schema": { "$ref": "#/entities/Gudep" },
+      "description": "Registered Gudep metadata managed by Pembina"
+    },
+    "/gudep/{gudepId}/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/GudepMaterial" },
+      "description": "Custom materials belonging to a Gudep"
+    },
+    "/gudep/{gudepId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/GudepTask" },
+      "description": "Additional tasks assigned by Pembina within a Gudep"
+    }
+  }
+}

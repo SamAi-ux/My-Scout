@@ -1,0 +1,224 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidJenjang(val) {
+      return val in ['Siaga', 'Penggalang', 'Penegak', 'Pembina', 'Pembina Damping'];
+    }
+
+    function isValidMaterialTarget(val) {
+      return val in ['Semua', 'Siaga', 'Penggalang', 'Penegak', 'Pembina', 'Pembina Damping'];
+    }
+
+    function isValidTaskTarget(val) {
+      return val in ['Semua', 'Siaga', 'Penggalang', 'Penegak'];
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 100 &&
+             data.username is string && data.username.size() >= 1 && data.username.size() <= 50 &&
+             data.email is string && data.email.size() <= 120 &&
+             isValidJenjang(data.jenjang) &&
+             data.institutionName is string && data.institutionName.size() <= 120 &&
+             data.gudepNumber is string && data.gudepNumber.size() <= 40 &&
+             data.unitName is string && data.unitName.size() <= 80 &&
+             data.xp is int && data.xp >= 0 && data.xp <= 1000000;
+    }
+
+    function isValidBackup(data) {
+      return data.payloadJson is string && data.payloadJson.size() <= 500000 &&
+             data.deviceLabel is string && data.deviceLabel.size() >= 1 && data.deviceLabel.size() <= 80;
+    }
+
+    function isValidGudep(data) {
+      return data.ownerId is string && data.ownerId == request.auth.uid &&
+             data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 100 &&
+             data.institutionName is string && data.institutionName.size() >= 2 && data.institutionName.size() <= 120 &&
+             data.gudepNumber is string && data.gudepNumber.size() >= 1 && data.gudepNumber.size() <= 40 &&
+             data.address is string && data.address.size() <= 250 &&
+             (!('logoBase64' in data) || (data.logoBase64 is string && data.logoBase64.size() <= 200000));
+    }
+
+    function isValidMaterial(data) {
+      return data.ownerId is string && data.ownerId == request.auth.uid &&
+             isValidId(data.gudepId) &&
+             data.title is string && data.title.size() >= 2 && data.title.size() <= 120 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             isValidMaterialTarget(data.jenjangTarget) &&
+             data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 300 &&
+             data.content is string && data.content.size() >= 1 && data.content.size() <= 10000 &&
+             data.published is bool;
+    }
+
+    function isValidTask(data) {
+      return data.ownerId is string && data.ownerId == request.auth.uid &&
+             isValidId(data.gudepId) &&
+             data.title is string && data.title.size() >= 2 && data.title.size() <= 120 &&
+             data.description is string && data.description.size() >= 1 && data.description.size() <= 2000 &&
+             isValidTaskTarget(data.jenjangTarget) &&
+             data.dueDateLabel is string && data.dueDateLabel.size() >= 1 && data.dueDateLabel.size() <= 40 &&
+             data.xpReward is int && data.xpReward >= 0 && data.xpReward <= 1000;
+    }
+
+    // 1. User Profiles (PII strictly isolated per owner)
+    match /users/{userId} {
+      allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().keys().hasAll(['userId', 'fullName', 'username', 'email', 'jenjang', 'institutionName', 'gudepNumber', 'unitName', 'xp', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'fullName', 'username', 'email', 'jenjang', 'institutionName', 'gudepNumber', 'unitName', 'xp', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'username', 'email', 'jenjang', 'institutionName', 'gudepNumber', 'unitName', 'xp', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      match /backups/{backupId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(userId) &&
+                         isValidId(backupId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['payloadJson', 'deviceLabel', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['payloadJson', 'deviceLabel', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidBackup(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(userId) &&
+                         isValidId(backupId) &&
+                         request.auth.uid == userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidBackup(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['payloadJson', 'deviceLabel', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(backupId) && request.auth.uid == userId;
+      }
+    }
+
+    // 2. Gudep Registry (Owned by Pembina, exact ID lookup by members)
+    match /gudep/{gudepId} {
+      allow get: if isSignedIn() && isValidId(gudepId);
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(gudepId) &&
+                       incoming().keys().hasAll(['ownerId', 'ownerName', 'institutionName', 'gudepNumber', 'address', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'ownerName', 'institutionName', 'gudepNumber', 'address', 'logoBase64', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidGudep(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(gudepId) &&
+                       existing().ownerId == request.auth.uid &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidGudep(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['ownerName', 'institutionName', 'gudepNumber', 'address', 'logoBase64', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(gudepId) && existing().ownerId == request.auth.uid;
+
+      match /materials/{materialId} {
+        allow get: if isSignedIn() && isValidId(gudepId) && isValidId(materialId);
+        allow list: if isSignedIn() && (
+          existing().ownerId == request.auth.uid ||
+          (existing().gudepId == gudepId && existing().published == true)
+        );
+
+        allow create: if isSignedIn() &&
+                         isValidId(gudepId) &&
+                         isValidId(materialId) &&
+                         incoming().gudepId == gudepId &&
+                         incoming().keys().hasAll(['ownerId', 'gudepId', 'title', 'category', 'jenjangTarget', 'summary', 'content', 'published', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['ownerId', 'gudepId', 'title', 'category', 'jenjangTarget', 'summary', 'content', 'published', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidMaterial(incoming()) &&
+                         get(/databases/$(database)/documents/gudep/$(gudepId)).data.ownerId == request.auth.uid;
+
+        allow update: if isSignedIn() &&
+                         isValidId(gudepId) &&
+                         isValidId(materialId) &&
+                         existing().ownerId == request.auth.uid &&
+                         incoming().ownerId == existing().ownerId &&
+                         incoming().gudepId == existing().gudepId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidMaterial(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'jenjangTarget', 'summary', 'content', 'published', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(gudepId) && isValidId(materialId) && existing().ownerId == request.auth.uid;
+      }
+
+      match /tasks/{taskId} {
+        allow get: if isSignedIn() && isValidId(gudepId) && isValidId(taskId);
+        allow list: if isSignedIn() && (
+          existing().ownerId == request.auth.uid ||
+          existing().gudepId == gudepId
+        );
+
+        allow create: if isSignedIn() &&
+                         isValidId(gudepId) &&
+                         isValidId(taskId) &&
+                         incoming().gudepId == gudepId &&
+                         incoming().keys().hasAll(['ownerId', 'gudepId', 'title', 'description', 'jenjangTarget', 'dueDateLabel', 'xpReward', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['ownerId', 'gudepId', 'title', 'description', 'jenjangTarget', 'dueDateLabel', 'xpReward', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidTask(incoming()) &&
+                         get(/databases/$(database)/documents/gudep/$(gudepId)).data.ownerId == request.auth.uid;
+
+        allow update: if isSignedIn() &&
+                         isValidId(gudepId) &&
+                         isValidId(taskId) &&
+                         existing().ownerId == request.auth.uid &&
+                         incoming().ownerId == existing().ownerId &&
+                         incoming().gudepId == existing().gudepId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidTask(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'jenjangTarget', 'dueDateLabel', 'xpReward', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(gudepId) && isValidId(taskId) && existing().ownerId == request.auth.uid;
+      }
+    }
+  }
+}

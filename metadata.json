@@ -1,0 +1,6 @@
+{
+  "name": "My Scout",
+  "description": "Aplikasi kepramukaan modern untuk manajemen Gugus Depan, materi pramuka, Scout Lab, SKU/TKK, kuis, dan kegiatan regu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
